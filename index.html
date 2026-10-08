@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎁 Amic Invisible Família</title>
+<style>
+body{font-family:system-ui,Arial,sans-serif;max-width:1000px;margin:0 auto;padding:20px;background:#f7f4ef;color:#222}
+h1{margin-bottom:2px}.sub{color:#666;margin-top:0}
+.card{background:#fff;border-radius:12px;padding:16px;margin:14px 0;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.row{display:flex;gap:8px;margin:6px 0}
+.row input{flex:1;padding:8px;border:1px solid #ccc;border-radius:8px}
+button{background:#c62828;color:#fff;border:0;border-radius:8px;padding:10px 16px;cursor:pointer;font-size:14px;margin:6px 6px 0 0}
+button.sec{background:#e8eaed;color:#222}button.green{background:#2e7d32}
+table{width:100%;border-collapse:collapse;margin-top:10px}
+th,td{border:1px solid #ddd;padding:8px;font-size:14px;text-align:left}
+th{background:#fce4ec}
+.tip{font-size:13px;color:#555;background:#fff8e1;padding:10px;border-radius:8px}
+#escenari{display:none;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+#compte{font-size:110px;font-weight:900;text-align:center;background:#222;color:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;min-height:320px}
+#marc{background:#000;border-radius:12px;min-height:320px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;overflow:hidden}
+#diapo{max-width:100%;max-height:280px;border-radius:8px;display:none}
+#peu{font-size:13px;color:#ccc;margin:6px}
+#mini img{height:50px;margin:3px;border-radius:6px}
+</style>
+</head>
+<body>
+<h1>🎁 Amic Invisible</h1>
+<p class="sub">Sorteig familiar · sense servidor · local + GitHub Pages</p>
+
+<div class="tip">
+<b>Assaig local:</b> activa <b>Mode simulació</b> → fa el compte enrere amb fotos i <b>mostra el resultat en pantalla sense enviar res</b>.
+El dia real: desactiva simulació → résultats ocults + botons <b>Enviar email</b> (1 clic per persona).
+</div>
+
+<div class="card">
+<h3>1. Participants (<span id="n">0</span>)</h3>
+<div id="llista"></div>
+<button class="sec" onclick="afegir()">＋ Afegeix</button>
+<button class="sec" onclick="guardar()">💾 Guarda</button>
+<label style="margin-left:10px;font-size:14px"><input type="checkbox" id="sim" checked> Mode simulació (no envia, mostra resultat)</label>
+</div>
+
+<div class="card">
+<h3>2. Fotos per al compte enrere</h3>
+<p style="font-size:13px;color:#555">Tria la <b>carpeta</b> amb les fotos (o arxius solts). Comptaré quantes hi ha i les repartiré en els 10 segons: <b>temps per foto = 10 / núm. fotos</b>. Per GitHub Pages, també pots pujar-les a la carpeta <code>fotos/</code> del repo.</p>
+<input type="file" id="fotoInput" accept="image/*" multiple webkitdirectory>
+<input type="file" id="fotoInput2" accept="image/*" multiple style="margin-top:6px">
+<div><span id="fotoStat" class="tip"></span></div>
+<div id="mini"></div>
+</div>
+
+<div class="card">
+<h3>3. Sorteig amb compte enrere (10 s)</h3>
+<button onclick="inicia()">🎲 Inicia compte enrere</button>
+<span id="stat"></span>
+<div id="escenari">
+<div id="compte">10</div>
+<div id="marc"><img id="diapo"><div id="peu"></div></div>
+</div>
+</div>
+
+<div class="card">
+<h3>4. Resultats</h3>
+<button class="sec" onclick="toggle()">👁 Mostra / Oculta</button>
+<table id="taula" style="display:none">
+<thead><tr><th>De</th><th>Li ha tocat</th><th>Enviar (només dia real)</th></tr></thead>
+<tbody id="cos"></tbody>
+</table>
+</div>
+
+<div class="card">
+<h3>5. Publicar a GitHub Pages</h3>
+<ol style="font-size:14px">
+<li>Puja <code>index.html</code> + carpeta <code>fotos/</code> al repo <code>amic-invisible</code>.</li>
+<li>Settings → Pages → <code>main</code> → <code>/ (root)</code>.</li>
+<li>Link: <code>https://elteuusuari.github.io/amic-invisible/</code></li>
+</ol>
+</div>
+
+<script>
+// ===== ✏️ EDITA AQUÍ NOMS I EMAILS (fàcil) =====
+const FAMILIA = [
+  ["David", "dranera@yahoo.fr"],
+  ["Isa", "isabelbardaji@yahoo.es"],
+  ["JOSEP MARÍA", "jbardaji@micap.es"],
+  ["Júlia", "juliaranera21@gmail.com"],
+  ["Montse", "mbardaji22@yahoo.es"],
+  ["OLGA", "osaenz@micap.es"],
+  ["Ana", "dr_ana@hotmail.com"],
+  ["Mina", "montsebosch24@gmail.com"],
+  ["Miki", "mabardaji@gmail.com"],
+];
+// ==============================================
+
+let RESULTAT = [], VISIBLE = false, FOTOS = [];
+
+function fila(nom='',mail=''){
+  const d = document.createElement('div');
+  d.className='row';
+  d.innerHTML = `<input class="nom" placeholder="Nom" value="${nom.replace(/"/g,'&quot;')}"><input class="mail" placeholder="email" value="${mail}"><button class="sec" onclick="this.parentNode.remove();compta()">✕</button>`;
+  document.getElementById('llista').appendChild(d); compta();
+}
+function compta(){ document.getElementById('n').textContent = document.querySelectorAll('#llista .row').length; }
+function llegir(){
+  return [...document.querySelectorAll('#llista .row')].map(r=>({
+    nom: r.querySelector('.nom').value.trim(),
+    mail: r.querySelector('.mail').value.trim()
+  })).filter(p=>p.nom);
+}
+function afegir(){ fila(); }
+function guardar(){ localStorage.setItem('amic', JSON.stringify(llegir())); alert('Guardat'); }
+(function(){
+  if(FAMILIA.length){ FAMILIA.forEach(p=>fila(p[0],p[1])); return; }
+  const g = JSON.parse(localStorage.getItem('amic')||'null');
+  if(g && g.length){ g.forEach(p=>fila(p.nom,p.mail)); }
+  else for(let i=0;i<12;i++) fila();
+})();
+
+// --- fotos ---
+function mostraMini(){
+  const m = document.getElementById('mini'); m.innerHTML='';
+  FOTOS.slice(0,20).forEach(f=>{ const u=URL.createObjectURL(f); m.innerHTML+=`<img src="${u}">`; });
+  const t = FOTOS.length ? `${FOTOS.length} fotos → ${(10/FOTOS.length).toFixed(2)} s per foto` : 'Cap foto triada (es veuran emojis).';
+  document.getElementById('fotoStat').textContent = t;
+}
+document.getElementById('fotoInput').addEventListener('change', e=>{ if(e.target.files.length){ FOTOS=[...e.target.files].filter(f=>f.type.startsWith('image/')); mostraMini(); } });
+document.getElementById('fotoInput2').addEventListener('change', e=>{ if(e.target.files.length){ FOTOS=[...e.target.files].filter(f=>f.type.startsWith('image/')); mostraMini(); } });
+// intenta carregar fotos/llista.json (GitHub Pages)
+fetch('fotos/llista.json').then(r=>r.ok?r.json():null).then(async j=>{
+  if(!j || !j.length) return;
+  FOTOS=[];
+  for(const nom of j){ try{ const r=await fetch('fotos/'+nom); const b=await r.blob(); FOTOS.push(new File([b],nom,{type:b.type})); }catch(e){} }
+  if(FOTOS.length) mostraMini();
+}).catch(()=>{});
+
+// --- sorteig + compte enrere ---
+function barrejaDerangement(P){
+  let idx = P.map((_,i)=>i), ok=false, intents=0;
+  while(!ok && intents<5000){ intents++; idx=[...idx].sort(()=>Math.random()-0.5); ok=idx.every((v,i)=>v!==i); }
+  return ok ? idx : null;
+}
+async function inicia(){
+  const P = llegir();
+  if(P.length<3){ alert('Calen 3+ persones'); return; }
+  const idx = barrejaDerangement(P);
+  if(!idx){ alert('Torna a provar'); return; }
+  RESULTAT = P.map((p,i)=>({de:p.nom,email:p.mail,perA:P[idx[i]].nom}));
+  // escenari 10 s
+  const esc = document.getElementById('escenari'); esc.style.display='grid';
+  const num = document.getElementById('compte'), img = document.getElementById('diapo'), peu = document.getElementById('peu');
+  const sim = document.getElementById('sim').checked;
+  const N = FOTOS.length, perFoto = N ? 10/N : 0;
+  let urls = FOTOS.map(f=>URL.createObjectURL(f));
+  const emojis = ['🎁','🎄','⭐','🔔','❄️','🎅','🕯️','🍾','🥂','💝'];
+  document.getElementById('stat').textContent = N ? `10 s · ${N} fotos · ${perFoto.toFixed(2)} s/foto` : '10 s · sense fotos (emojis)';
+  let fotoI = 0, tFoto = 0;
+  for(let s=10;s>=0;s--){
+    num.textContent = s;
+    // foto proporcional
+    if(N){
+      const k = Math.min(N-1, Math.floor((10-s)/perFoto));
+      if(urls[k]!==img.src){ img.src=urls[k]; img.style.display='block'; }
+      peu.textContent = `Foto ${k+1}/${N} · ${(perFoto).toFixed(2)} s cadascuna`;
+    } else { num.textContent = emojis[10-s]||s; peu.textContent=''; img.style.display='none'; }
+    await new Promise(r=>setTimeout(r,1000));
+  }
+  num.textContent='🎉';
+  // resultat
+  const esSim = sim;
+  VISIBLE = esSim; // simulació: mostra; real: ocult
+  pinta(esSim);
+  document.getElementById('stat').textContent = esSim ? 'Simulació: resultat visible, NO s’ha enviat res.' : 'Sortejat! Resultat ocult. Prem Enviar email per cadascú.';
+}
+
+function pinta(esSim){
+  const cos = document.getElementById('cos'); cos.innerHTML='';
+  RESULTAT.forEach(r=>{
+    const dest = VISIBLE ? `<b>${r.perA}</b>` : '••• (ocult)';
+    const subject = encodeURIComponent(`🎁 Amic Invisible: t'ha tocat!`);
+    const body = encodeURIComponent(`Hola ${r.de}!\n\nT'HA TOCAT: ${r.perA}\n\nGuarda el secret i que vagi bé el regal!`);
+    const mailto = `mailto:${encodeURIComponent(r.email)}?subject=${subject}&body=${body}`;
+    const env = esSim ? '<small>sense enviament</small>' : `<a href="${mailto}"><button class="green">✉️ Enviar email</button></a>`;
+    cos.innerHTML += `<tr><td>${r.de}<br><small>${r.email}</small></td><td>${dest}</td><td>${env}</td></tr>`;
+  });
+  document.getElementById('taula').style.display = RESULTAT.length ? 'table' : 'none';
+}
+function toggle(){ VISIBLE=!VISIBLE; pinta(document.getElementById('sim').checked); }
+</script>
+</body>
+</html>
