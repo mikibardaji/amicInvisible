@@ -67,7 +67,7 @@ El dia real: desactiva simulació → résultats ocults + botons <b>Enviar email
 <button class="green" onclick="enviaTot()">✉️ Envia-ho TOT automàtic (EmailJS)</button>
 <span id="envStat"></span>
 <table id="taula" style="display:none">
-<thead><tr><th>De</th><th>Li ha tocat</th><th>Enviar (només dia real)</th></tr></thead>
+<thead><tr><th>De</th><th>Li ha tocat</th></tr></thead>
 <tbody id="cos"></tbody>
 </table>
 </div>
@@ -199,11 +199,7 @@ function pinta(esSim){
   const cos = document.getElementById('cos'); cos.innerHTML='';
   RESULTAT.forEach(r=>{
     const dest = VISIBLE ? `<b>${r.perA}</b>` : '••• (ocult)';
-    const subject = encodeURIComponent(`🎁 Amic Invisible: t'ha tocat!`);
-    const body = encodeURIComponent(`Hola ${r.de}!\n\nT'HA TOCAT: ${r.perA}\n\nGuarda el secret i que vagi bé el regal!`);
-    const mailto = `mailto:${encodeURIComponent(r.email)}?subject=${subject}&body=${body}`;
-    const env = esSim ? '<small>sense enviament</small>' : `<a href="${mailto}"><button class="green">✉️ Enviar email</button></a>`;
-    cos.innerHTML += `<tr><td>${r.de}<br><small>${r.email}</small></td><td>${dest}</td><td>${env}</td></tr>`;
+    cos.innerHTML += `<tr><td>${r.de}<br><small>${r.email}</small></td><td>${dest}</td></tr>`;
   });
   document.getElementById('taula').style.display = RESULTAT.length ? 'table' : 'none';
 }
@@ -241,7 +237,7 @@ async function enviaTot(){
   if(!RESULTAT.length){ alert('Primer fes el sorteig'); return; }
   const C = getClaus();
   if(!C.PUBLIC_KEY || !C.SERVICE_ID || !C.TEMPLATE_ID){
-    alert('Falten les 3 claus: posa-les al panell "Claus EmailJS" (es desen al navegador). Mentrestant usa els botons Enviar email d’abans.');
+    alert('Falten les 3 claus: revisa el fitxer config.js al costat de index.html.');
     return;
   }
   if(!confirm(`Enviaràs ${RESULTAT.length} emails de cop. Segur? (desactiva simulació)`)) return;
