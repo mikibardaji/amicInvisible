@@ -52,6 +52,7 @@ El dia real: desactiva simulació → résultats ocults + botons <b>Enviar email
 
 <div class="card">
 <h3>3. Sorteig amb compte enrere (10 s)</h3>
+<p style="font-size:13px;color:#555" id="modeTxt"></p>
 <button onclick="inicia()">🎲 Inicia compte enrere</button>
 <span id="stat"></span>
 <div id="escenari">
@@ -63,6 +64,8 @@ El dia real: desactiva simulació → résultats ocults + botons <b>Enviar email
 <div class="card">
 <h3>4. Resultats</h3>
 <button class="sec" onclick="toggle()">👁 Mostra / Oculta</button>
+<button class="green" onclick="enviaTot()">✉️ Envia-ho TOT automàtic (EmailJS)</button>
+<span id="envStat"></span>
 <table id="taula" style="display:none">
 <thead><tr><th>De</th><th>Li ha tocat</th><th>Enviar (només dia real)</th></tr></thead>
 <tbody id="cos"></tbody>
@@ -72,13 +75,16 @@ El dia real: desactiva simulació → résultats ocults + botons <b>Enviar email
 <div class="card">
 <h3>5. Publicar a GitHub Pages</h3>
 <ol style="font-size:14px">
-<li>Puja <code>index.html</code> + carpeta <code>fotos/</code> al repo <code>amic-invisible</code>.</li>
+<li>Puja <code>index.html</code> + <code>config.js</code> + carpeta <code>fotos/</code> al repo <code>amic-invisible</code> (el teu germà només edita <code>config.js</code>).</li>
 <li>Settings → Pages → <code>main</code> → <code>/ (root)</code>.</li>
 <li>Link: <code>https://elteuusuari.github.io/amic-invisible/</code></li>
 </ol>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="config.js"></script>
 <script>
+// ===== ✏️ 1) NOMS I EMAILS (fàcil) =====
 // ===== ✏️ EDITA AQUÍ NOMS I EMAILS (fàcil) =====
 const FAMILIA = [
   ["David", "dranera@yahoo.fr"],
@@ -92,6 +98,15 @@ const FAMILIA = [
   ["Miki", "mabardaji@gmail.com"],
 ];
 // ==============================================
+// ===== ✏️ 2) CLAUS EMAILJS — en fitxer separat config.js =====
+// No les posis aquí. Edita només config.js (mateixa carpeta).
+// L'app les llegeix de window.EMAILJS_CONFIG, o del navegador si hi són.
+const EMAILJS = {
+  PUBLIC_KEY: "",
+  SERVICE_ID: "",
+  TEMPLATE_ID: ""
+};
+// ============================================================
 
 let RESULTAT = [], VISIBLE = false, FOTOS = [];
 
@@ -102,6 +117,13 @@ function fila(nom='',mail=''){
   document.getElementById('llista').appendChild(d); compta();
 }
 function compta(){ document.getElementById('n').textContent = document.querySelectorAll('#llista .row').length; }
+function modeTxt(){
+  const sim = document.getElementById('sim').checked;
+  document.getElementById('modeTxt').innerHTML = sim
+    ? '🟡 <b>SIMULACIÓ:</b> mostrarà el resultat en pantalla i NO enviarà res.'
+    : '🔴 <b>DIA REAL:</b> resultat ocult + enviament per EmailJS.';
+}
+document.getElementById('sim').addEventListener('change', modeTxt); modeTxt();
 function llegir(){
   return [...document.querySelectorAll('#llista .row')].map(r=>({
     nom: r.querySelector('.nom').value.trim(),
@@ -186,6 +208,58 @@ function pinta(esSim){
   document.getElementById('taula').style.display = RESULTAT.length ? 'table' : 'none';
 }
 function toggle(){ VISIBLE=!VISIBLE; pinta(document.getElementById('sim').checked); }
+
+function getClaus(){
+  try{
+    const w = (window.EMAILJS_CONFIG || {});
+    const g = JSON.parse(localStorage.getItem('emailjs_cfg')||'{}');
+    return {
+      PUBLIC_KEY: w.PUBLIC_KEY || g.PUBLIC_KEY || EMAILJS.PUBLIC_KEY || '',
+      SERVICE_ID: w.SERVICE_ID || g.SERVICE_ID || EMAILJS.SERVICE_ID || '',
+      TEMPLATE_ID: w.TEMPLATE_ID || g.TEMPLATE_ID || EMAILJS.TEMPLATE_ID || ''
+    };
+  }catch(e){ return EMAILJS; }
+}
+function desaClaus(){
+  const c = { PUBLIC_KEY: document.getElementById('kPub').value.trim(),
+    SERVICE_ID: document.getElementById('kSrv').value.trim(),
+    TEMPLATE_ID: document.getElementById('kTpl').value.trim() };
+  localStorage.setItem('emailjs_cfg', JSON.stringify(c));
+  document.getElementById('kStat').textContent = 'Desades al navegador ✅ (no van a GitHub)';
+  document.getElementById('kPub').value = document.getElementById('kSrv').value = document.getElementById('kTpl').value = '';
+}
+function esborraClaus(){ localStorage.removeItem('emailjs_cfg'); document.getElementById('kStat').textContent = 'Esborrades.'; }
+(function(){ // precarrega estat
+  try{
+    const g = JSON.parse(localStorage.getItem('emailjs_cfg')||'{}');
+    if(g.PUBLIC_KEY) document.getElementById('kStat').textContent = 'Hi ha claus desades ✅';
+  }catch(e){}
+})();
+
+async function enviaTot(){
+  const st = document.getElementById('envStat');
+  if(!RESULTAT.length){ alert('Primer fes el sorteig'); return; }
+  const C = getClaus();
+  if(!C.PUBLIC_KEY || !C.SERVICE_ID || !C.TEMPLATE_ID){
+    alert('Falten les 3 claus: posa-les al panell "Claus EmailJS" (es desen al navegador). Mentrestant usa els botons Enviar email d’abans.');
+    return;
+  }
+  if(!confirm(`Enviaràs ${RESULTAT.length} emails de cop. Segur? (desactiva simulació)`)) return;
+  try{ emailjs.init(C.PUBLIC_KEY); }catch(e){}
+  let ok=0;
+  for(let i=0;i<RESULTAT.length;i++){
+    const r = RESULTAT[i];
+    st.textContent = `Enviant ${i+1}/${RESULTAT.length}: ${r.de}...`;
+    try{
+      await emailjs.send(C.SERVICE_ID, C.TEMPLATE_ID, {
+        to_email: r.email, to_name: r.de, perA: r.perA
+      });
+      ok++;
+    }catch(e){ alert(`Error amb ${r.de} (${r.email}): ` + (e.text||e.message)); break; }
+    await new Promise(r2=>setTimeout(r2,800)); // evita límit gratis
+  }
+  st.textContent = `Fet: ${ok}/${RESULTAT.length} enviats.`;
+}
 </script>
 </body>
 </html>
